@@ -1,6 +1,7 @@
 local planet = require("planet")
 local fonts = require("fonts")
 local bullets = require("bullets")
+local player = require("player")
 
 require("utils")
 
@@ -16,8 +17,13 @@ local boss = {
 }
 
 function boss:update(dt)
-	self.angle = self.angle +(self.speed * dt)
+	self.angle = self.angle + (self.speed * dt)
 	self.shot_timer = self.shot_timer + dt
+	local x, y = offsetByVector(planet.center, self.angle, planet.r + 10)
+	if self.shot_timer * 2 > love.math.random(1,10) then
+		self.shot_timer = 0
+		bullets:addWithTarget(x, y, player.x, player.y)
+	end
 end
 
 local function red()
@@ -36,7 +42,8 @@ function boss:render()
 	gfx.rotate(self.angle - math.pi / 2)
 	gfx.translate(0, 5)
 	gfx.setColor({255, 0, 0})
-	-- TODO: draw arms
+	--[[
+	--  draw arms
 	gfx.line(-20, -5, -12, 5)
 	gfx.line(20, -5, 12, 5)
 
@@ -50,13 +57,14 @@ function boss:render()
 	gfx.ellipse("fill", 20, -5, xrDrum, yrDrum)
 	red()
 	gfx.ellipse("line", 20, -5, xrDrum, yrDrum)
-	-- TODO: draw arms
+
 	-- Draw body
 	-- (-12, 5) (25)
 	local x,y,w,h,r, seg = -12, 5, 24, 10, 3, 3, 10
 	gfx.rectangle("line", x, y,w, h)
 	-- Draw neck
 	gfx.line(0,20, 0, 15)
+	]]
 	-- Draw head
 	--gfx.ellipse("line", 0, 25, 8, 5)
 	gfx.polygon("line", 
