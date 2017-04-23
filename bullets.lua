@@ -1,0 +1,5 @@
+
+local bullets = {}
+
+
+return bullets

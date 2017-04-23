@@ -1,6 +1,8 @@
 require("utils")
 -- local debug = require("lovedebug")
 
+local starfield = {}
+
 local function update(self, dt)
 	for i=1, #self.stars do
 		local s = self.stars[i]
@@ -54,18 +56,14 @@ local function makeStar()
 	}
 end
 
-function make_starfield()
-	local starfield = {
-		stars = {},
-		update = update,
-		render = render,
-		rm_render = false,
-		rm_update = false,
-	}
-	for i=1, 100 do
-		table.insert(starfield.stars, makeStar())
-	end
-	return starfield
+local starfield = {
+	stars = {},
+	update = update,
+	render = render,
+	rm_render = false,
+	rm_update = false,
+}
+for i=1, 50 do
+	table.insert(starfield.stars, makeStar())
 end
-
-return make_starfield
+return starfield

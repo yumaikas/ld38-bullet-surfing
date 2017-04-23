@@ -1,101 +1,18 @@
-local images = require("images")
-local sounds = require("sounds")
-
-local function player_update(self, dt)
-	key = love.keyboard
-	if key.isDown("w") then
-		self.y = self.y - self.speed * dt
-	end
-	if key.isDown("s") then
-		self.y = self.y + self.speed * dt
-	end
-	if key.isDown("d") then
-		self.x = self.x + self.speed * dt
-		self.scale.x = math.copysign(self.scale.x, 1)
-	end
-	if key.isDown("a") then
-		self.x = self.x - self.speed * dt
-		self.scale.x = math.copysign(self.scale.x, -1)
-	end
-
-	-- Tick up the invuln frames
-	if self.hit_timer <= self.hit_delay then
-		self.hit_timer = self.hit_timer + dt
-		if self.hit_timer >= self.hit_delay then
-			self.rm_render = false
-			addRenderable(self)
-		else
-			self.rm_render = not self.rm_render
-			if not self.rm_render then
-				addRenderable(self)
-			end
-		end
-	end
-
-	if not self.can_shoot then
-		self.shot_timer = self.shot_timer + dt
-	end
-	if self.shot_timer > self.shot_time then
-		self.can_shoot = true
-		self.shot_timer = 0
-	end
-
-
-	keys = {"up", "down", "left", "right"}
-	for i=1, #keys do
-		if key.isDown(keys[i]) and self.can_shoot then
-			--off = self.spell_offset
-			local spell = spawn_spell(
-				self.x,-- + off.x,
-				self.y, -- + off.y,
-				 keys[i])
-			addRenderable(spell)
-			addUpdateable(spell)
-			addPlayerSpell(spell)
-			self.can_shoot = false
-			sounds["explosion.wav"]:stop()
-			sounds["explosion.wav"]:play()
-			break
-		end
-	end
-
-	local xbounds = self.bounds.x
-	local ybounds = self.bounds.y
-	local w = self.w * 2
-	local h = self.h * 2
-	if (self.x) < xbounds.min then
-		self.x = xbounds.min
-	end
-	if (self.y) < ybounds.min then
-		self.y = ybounds.min
-	end
-
-	if (self.x ) > xbounds.max then
-		self.x = xbounds.max
-	end
-	if (self.y ) > ybounds.max then
-		self.y = ybounds.max
-	end
-end
-
--- Renderable, Updatable player
-function get_new_player( ... )
-return {
+local planet = require("planet")
+local player = {
 	-- Renderable
-	x = 0,
-	y = 0,
+	x = planet.center.x,
+	y = planet.center.y,
+	oldx = 0.0,
+	oldy = 0.0,
 	scale = {
-		x = 2.0,
-		y = 2.0
+		x = 1.0,
+		y = 1.0
 	},
-	rotation = 0,
-	image = images["Wizard.png"],
 
-	-- Bounding
-	bounds = {
-		x = { min = 0, max = g_width },
-		y = { min = 0, max = g_height },
-	},
+	moving = false,
+
+	rotation = 0,
 	w = 0,
 	h = 0,
 
@@ -109,36 +26,168 @@ return {
 
 	-- Custom player information
 	speed = 200,
-	shot_time = .2,
-	shot_timer = 0,
+	dash_time = .2,
+	dash_recharge_time = 1.2,
+	dash_timer = .21,
+	dash_speed_boost = 2.5,
+
 	offset = {
 		x = 10,
 		y = 10,
 	},
 	spell_offset = { x = 20, y = 20 },
 	can_shoot = false,
-	scaled = function (self, name)
-		return self[name] * self.scale
-	end,
 	-- HP, to be used by player_health
 	HP = 4,
 	hit_timer = 2.1,
 	hit_delay = 2,
-	is_vulnerable = function (self)
-		return self.hit_timer > self.hit_delay
-	end,
-	heal = function(self, damage)
-		self.HP = self.HP + damage
-		self.HP = math.clamp(0, self.HP, 4)
-		sounds["pickup.wav"]:play()
-	end,
-	harm = function (self, damage)
-		self.HP = self.HP - damage
-		self.HP = math.clamp(0, self.HP, 4)
-		self.hit_timer = 0
-		sounds["hurt2.wav"]:play()
-	end
 }
+
+
+function player:heal(damage)
+	self.HP = self.HP + damage
+	self.HP = math.clamp(0, self.HP, 4)
+	sounds["pickup.wav"]:play()
 end
 
-return get_new_player()
+function player:harm(damage)
+	self.HP = self.HP - damage
+	self.HP = math.clamp(0, self.HP, 4)
+	self.hit_timer = 0
+	sounds["hurt2.wav"]:play()
+end
+
+function player:scaled(name)
+	return self[name] * self.scale
+end
+
+function player:is_vulnerable()
+	return self.hit_timer > self.hit_delay
+end
+
+function player:getSpeed()
+	if self.dash_timer > self.dash_time then
+		return self.speed
+	else
+		return self.speed * self.dash_speed_boost
+	end
+end
+
+function player:isdashing()
+	return self.dash_timer < self.dash_time
+end
+
+function player:isRechargingDash()
+	return not self:isdashing() and (self.dash_timer < self.dash_recharge_time)
+end
+
+function player:update(dt)
+	key = love.keyboard
+	self.oldx, self.oldy = self.x, self.y
+	self.moving = false
+	if key.isDown("space") and (self.dash_timer > self.dash_recharge_time) then
+		self.dash_timer = 0.0
+	end
+
+	if self:isdashing() or self:isRechargingDash() then
+		self.dash_timer = self.dash_timer + dt
+	end
+
+	if key.isDown("w") then
+		self.y = self.y - self:getSpeed() * dt
+	end
+	if key.isDown("s") then
+		self.y = self.y + self:getSpeed() * dt
+	end
+	if key.isDown("d") then
+		self.x = self.x + self:getSpeed() * dt
+		self.scale.x = math.copysign(self.scale.x, 1)
+		self.moving = true
+	end
+	if key.isDown("a") then
+		self.x = self.x - self:getSpeed() * dt
+		self.scale.x = math.copysign(self.scale.x, -1)
+		self.moving = true
+	end
+
+
+	-- TODO: Implement falloff death
+	-- TODO: Implement 
+end
+
+function player:render()
+	local gfx = love.graphics
+	gfx.push()
+	gfx.translate(self.x, self.y)
+	if self:isdashing() then
+		gfx.push()
+		local dx, dy = self.x - self.oldx, self.y - self.oldy
+		gfx.rotate(math.atan2(dy, dx))
+		gfx.translate(12, 0)
+		gfx.setColor({255,0,255})
+		gfx.line(
+			-20, -20,
+			20, -20,
+			40, -5,
+			40, 5,
+			20, 20,
+			-20, 20
+		)
+		gfx.pop()
+	end
+
+	gfx.scale(self.scale.x, self.scale.y)
+	gfx.translate(-7.5, 0)
+
+	local x_off = 0.0
+	if self.moving then
+		x_off = 3
+	end
+
+	gfx.setColor({255,255,0})
+
+
+
+	-- Rectanglular body
+	gfx.polygon("line",
+		0,0,
+		15,0,
+		15,7,
+		0,7)
+
+	gfx.line(
+		0,0,
+		-3 - x_off,7)
+
+	-- Legs
+	gfx.line(
+		15, 7,
+		15 - x_off, 13)
+	gfx.line(
+		13, 7,
+		13 - x_off, 13)
+	gfx.line(
+		0, 7,
+		0 - x_off, 13)
+	gfx.line(
+		3, 7,
+		3 - x_off, 13)
+
+	--Neck/Head
+	gfx.line(
+		15, 0,
+		15 + x_off, -6,
+		22 + x_off, -6,
+		22 + x_off, -8,
+		15 + x_off, -8)
+
+	-- Ear(s)
+	gfx.line(
+		15 + x_off, -8,
+		15 + 2 * x_off, - 12)
+
+	gfx.pop()
+end
+
+return player
+

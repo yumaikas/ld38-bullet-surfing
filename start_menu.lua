@@ -1,10 +1,19 @@
 local fonts = require("fonts")
-local starfield = require("starfield")()
+local starfield = require("starfield")
+local boss = require("boss")
+local planet = require("planet")
+local player = require("player")
+local phase_one = require("phase1")
 
 local start_menu = {}
 
 function start_menu:update(dt)
 	starfield:update(dt)
+	player:update(dt)
+end
+
+function start_menu:keypressed(key, scancode, isrepeat)
+	G = phase_one
 end
 
 function yellow_font()
@@ -22,6 +31,11 @@ function red_font()
 end
 
 function start_menu:render()
+	starfield:render()
+	planet:render()
+	boss:render()
+	player:render()
+
 	local bigf = fonts.atSize(80)
 	local smallf = fonts.atSize(28)
 	local g = love.graphics
@@ -41,7 +55,6 @@ function start_menu:render()
 	g.translate(-90 - 80, 40)
 	g.print("The Mad Alien Cotxahol")
 	g.pop()
-	starfield:render()
 end
 
 return start_menu

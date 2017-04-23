@@ -17,16 +17,19 @@ function love.load()
 	require("starfield")
 end
 
+function love.keypressed(key, scancode, isrepeat)
+	G.keypressed(key, scancode, isrepeat)
+end
+
 function love.draw()
 	love.graphics.setFont(fonts.atSize(10))
-	local w, h = love.graphics.getDimensions()
-	love.graphics.print("w: " ..w)
-	love.graphics.print("h: " ..h, 0, 10)
+	love.graphics.print("FPS: " .. tostring(love.timer.getFPS()))
 
 	if G.render then
 		G:render()
 		return
 	end
+	
 	if shake_timer < shake_time then
 		love.graphics.push()
 		love.graphics.translate(math.prandom(-shake_mag, shake_mag), math.prandom(-shake_mag, shake_mag))
