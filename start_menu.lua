@@ -13,12 +13,14 @@ function start_menu:update(dt)
 end
 
 function start_menu:keypressed(key, scancode, isrepeat)
-	G = phase_one
+	if key == "w" or key == "s" or key == "a" or key == "d" or key == "space" then
+		G = phase_one
+	end
 end
 
 function yellow_font()
 	local g = love.graphics
-	g.setColor(0,255,255)
+	g.setColor(255,255,0)
 end
 function white_font()
 	local g = love.graphics
@@ -30,31 +32,33 @@ function red_font()
 	g.setColor(255,0,0)
 end
 
-function start_menu:render()
-	starfield:render()
-	planet:render()
-	boss:render()
-	player:render()
-
-	local bigf = fonts.atSize(80)
+function render_first_menu()
+	local bigf = fonts.atSize(40)
 	local smallf = fonts.atSize(28)
+	local tinyf = fonts.atSize(16)
 	local g = love.graphics
 	g.push()
 	-- g.scale(2,2)
-	g.translate(210, 180)
+	g.translate(270, 220)
 	g.setFont(bigf)
 	red_font()
-	g.print("PSI-land")
-	g.translate(80, 110)
+	g.print("Omega Llama")
 	white_font()
 	g.setFont(smallf)
-	yellow_font()
-	g.print("Omega Llama")
-	g.translate(90, 40)
-	g.print("vs")
-	g.translate(-90 - 80, 40)
-	g.print("The Mad Alien Cotxahol")
+	g.print("in", 110, 50)
+	g.setFont(bigf)
+	g.setColor({255,0,255})
+	g.print("BULLET SURFING", -20, 90)
+	g.setFont(tinyf)
+	g.setColor({0,255,255})
+	g.print("W/A/S/D and Spacebar. ESC exits", -10, 150)
 	g.pop()
+end
+
+function start_menu:render()
+	starfield:render()
+	planet:render()
+	render_first_menu()
 end
 
 return start_menu

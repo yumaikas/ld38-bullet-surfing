@@ -8,26 +8,33 @@ require("utils")
 local boss = {
 	angle = 0.0,
 	speed = 0.5,
+	HP = 20,
 	fire_speed = 0.75,
-	r_fire_timer = 0.0,
-	l_fire_timer = 0.0,
 	shot_timer = 0.0,
 	rm_render = false,
 	rm_update = false,
 }
 
 function boss:update(dt)
-	self.angle = self.angle + (self.speed * dt)
+	if math.fmod(math.floor(player.dash_combo / 50), 2) == 0 then
+		self.angle = self.angle + (self.speed * dt * (0.1 * love.math.random(2, 18)))
+	else
+		self.angle = self.angle - (self.speed * dt * (0.1 * love.math.random(2, 18)))
+	end
 	self.shot_timer = self.shot_timer + dt
-	local x, y = offsetByVector(planet.center, self.angle, planet.r + 10)
-	if self.shot_timer * 2 > love.math.random(1,10) then
+	local x, y = offsetByVector(planet.center, self.angle, planet.r + 15)
+	if self.shot_timer * 2 > (love.math.random(1,5) - 0.75) and math.dist(x, y, player.x, player.y) > 90 then
 		self.shot_timer = 0
-		bullets:addWithTarget(x, y, player.x, player.y)
+		local tx, ty = offsetByVector({x = player.x, y = player.y}, love.math.random(1,180) / math.pi, love.math.random(0, 40))
+		bullets:addWithTarget(x, y, tx, ty)
 	end
 end
 
 local function red()
 	love.graphics.setColor({255, 0, 0})
+end
+local function blue()
+	love.graphics.setColor({0, 0, 255})
 end
 local function black()
 	love.graphics.setColor({0, 0, 0})
@@ -37,36 +44,15 @@ function boss:render()
 	local gfx = love.graphics
 	local x, y = offsetByVector(planet.center, self.angle, planet.r + 10)
 	local xrDrum, yrDrum = 10, 5
+
 	love.graphics.push()
 	gfx.translate(x, y)
 	gfx.rotate(self.angle - math.pi / 2)
 	gfx.translate(0, 5)
 	gfx.setColor({255, 0, 0})
-	--[[
-	--  draw arms
-	gfx.line(-20, -5, -12, 5)
-	gfx.line(20, -5, 12, 5)
-
-	-- Draw drums
-	black()
-	gfx.ellipse("fill", -20, -5, xrDrum, yrDrum)
-	red()
-	gfx.ellipse("line", -20, -5, xrDrum, yrDrum)
-
-	black()
-	gfx.ellipse("fill", 20, -5, xrDrum, yrDrum)
-	red()
-	gfx.ellipse("line", 20, -5, xrDrum, yrDrum)
-
-	-- Draw body
-	-- (-12, 5) (25)
-	local x,y,w,h,r, seg = -12, 5, 24, 10, 3, 3, 10
-	gfx.rectangle("line", x, y,w, h)
-	-- Draw neck
-	gfx.line(0,20, 0, 15)
-	]]
-	-- Draw head
-	--gfx.ellipse("line", 0, 25, 8, 5)
+	if math.dist(player.x, player.y, x, y) < 60 then
+		blue()
+	end
 	gfx.polygon("line", 
 		-8, 35,
 		-- -5, 29,
@@ -84,7 +70,6 @@ function boss:render()
 		-6, 31,
 		-4, 27,
 		-16, 30)
-	--gfx.line(-6, 25, -2, 20)
 	gfx.pop()
 end
 
