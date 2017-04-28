@@ -1,6 +1,10 @@
 local player = require("player")
 local planet = require("planet")
 local sounds = require("sounds")
+local blorb = require("blorb")
+
+local win_combo = 700
+
 require("utils")
 
 local bullets = {
@@ -36,9 +40,6 @@ function bullets:render()
 		gfx.setColor({255,10,10})
 		gfx.circle("line", b.x, b.y, 5)
 	end
-
-	gfx.setColor({255,0,255})
-	gfx.circle("line", planet.center.x, planet.center.y, 20)
 end
 
 function player:enterBulletTime()
@@ -69,14 +70,21 @@ function bullets:update(dt)
 		local d2 = math.dist(b.x, b.y, player.x2, player.y2)
 		if d < 20 or d2 < 20 then
 			if player:isdashing() then
-				player:heal(0.5)
-				player.dash_timer = math.clamp(-2.1, player.dash_timer - math.clamp(0.25,  player.dash_combo / player.dash_max_combo, 1), 4)
 				player:comboup()
 				b.remove = true
 			elseif d < 10 then
-				player:harm(1)
 				b.remove = true
 			end
+		end
+
+		for i=1, #blorb.instances do
+			local bl = blorb.instances[i]
+
+			-- Where 5 is the bullet render radius
+			if math.dist(bl.x, bl.y, b.x, b.y) < bl.r + 5  then
+				b.remove = true
+			end
+
 		end
 
 		if math.dist(b.ox,b.oy, b.x, b.y) > 500 then
@@ -88,10 +96,6 @@ function bullets:update(dt)
 		if self.shots[i].remove then
 			table.remove(self.shots, i)
 		end	
-	end
-
-	if math.dist(player.x, player.y, planet.center.x, planet.center.y) <= 20 then
-		player.dash_timer = player.dash_time + 0.1
 	end
 end
 

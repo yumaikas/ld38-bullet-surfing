@@ -2,6 +2,7 @@ local planet = require("planet")
 local fonts = require("fonts")
 local sounds = require("sounds")
 require("utils")
+local win_combo = 700
 local player = {
 	-- Renderable
 	x = planet.center.x,
@@ -31,9 +32,11 @@ local player = {
 
 	-- Custom player information
 	speed = 200,
-	dash_time = .2,
-	dash_recharge_time = 1.2,
-	dash_timer = .21,
+	dash_recharge_time = 1.5,
+	dash_recharge_timer = 0.0,
+	dash_timer = 0.0,
+	dash_max_time = 2.5,
+	dash_time = 0.0,
 	dash_speed_boost = 2.5,
 	dash_combo = 0,
 	dash_max_combo = 1,
@@ -54,7 +57,23 @@ local player = {
 
 function player:comboup()
 	self.dash_combo = self.dash_combo + 1
-	sounds.pickup:setPitch(0.1 * love.math.random(8,12))
+	player.dash_timer = player.dash_timer + math.clamp(0.5,  player.dash_combo / win_combo , 1)
+
+	if player.dash_timer > player.dash_max_time then
+		player.dash_timer = player.dash_max_time
+	end
+
+	local top = player.dash_combo - player:previousTarget() + 1
+	--print("top: ".. tostring(top))
+	local bot = player:targetCombo() - player:previousTarget()
+	--print("bot: ".. tostring(bot))
+
+	local pitchVal = 2 * top / bot
+	if player.dash_combo == player:previousTarget() then
+		pitchVal = 4
+	end
+	-- print("Pitch".. tostring(pitchVal))
+	sounds.pickup:setPitch(pitchVal)
 	sounds.pickup:stop()
 	sounds.pickup:play()
 end
@@ -81,76 +100,103 @@ function player:is_vulnerable()
 end
 
 function player:getSpeed()
-	if self.dash_timer > self.dash_time then
-		return self.speed
-	else
+	if self:isdashing() then
 		return self.speed * self.dash_speed_boost
+	else
+		return self.speed
 	end
 end
 
 function player:isdashing()
-	return self.dash_timer < self.dash_time
+	return self.dash_timer > 0.0
 end
 
 function player:isRechargingDash()
-	return not self:isdashing() and (self.dash_timer < self.dash_recharge_time)
+	return not self:isdashing() and (self.dash_recharge_timer > 0.0)
 end
 
 function player:update(dt)
 	key = love.keyboard
-	local old_dx, old_dy = self.x - self.oldx, self.y - self.oldy
-	self.oldx, self.oldy = self.x, self.y
-
-	self.moving = false
-	if key.isDown("space") and (self.dash_timer > self.dash_recharge_time) then
-		self.dash_timer = 0.0
+	local old_dx, old_dy = self.oldx - self.x, self.oldy - self.y
+	local joySticks = love.joystick.getJoysticks()
+	local j
+	if #joySticks >= 1 then
+		j = joySticks[1]
 	end
 
-	if self:isdashing() or self:isRechargingDash() then
-		self.dash_timer = self.dash_timer + dt
-	end
-
-	if self.hit_timer < self.hit_delay then
-		self.hit_timer = self.hit_timer + dt
-	end
-
-	if key.isDown("w") then
-		self.y = self.y - self:getSpeed() * dt
-	end
-	if key.isDown("s") then
-		self.y = self.y + self:getSpeed() * dt
-	end
-	if key.isDown("d") then
-		self.x = self.x + self:getSpeed() * dt
-		self.scale.x = math.copysign(self.scale.x, 1)
-		self.moving = true
-	end
-	if key.isDown("a") then
-		self.x = self.x - self:getSpeed() * dt
-		self.scale.x = math.copysign(self.scale.x, -1)
-		self.moving = true
-	end
-
-	-- TODO: Figure out how to clean this up to keep moving in a straight line
-	local dx, dy = self.x - self.oldx, self.y - self.oldy
-	if dx == 0 and dy == 0 and self:isdashing() then
-		local nangle = math.atan2(old_dx, old_dy) 
-		self.x, self.y = offsetByVector({x = self.x, y = self.y}, nangle, self:getSpeed() * dt)
-		self.x2, self.y2 = offsetByVector({x = self.x, y = self.y}, nangle, 20)
-		self:clamp()
-		return
+	if (key.isDown("space") or 
+		(#joySticks >=1 and j:isGamepadDown("a", "b", "x", "y")))
+		and not self:isdashing() and not self:isRechargingDash() 
+		and self.angle
+		then
+		self:comboup()
 	end
 
 	if not self:isdashing() and self.dash_combo > 0 then
-		if self.dash_combo > self.dash_max_combo then
-			self:enterBulletTime()
-		end
-		self.dash_max_combo = math.max(self.dash_combo, self.dash_max_combo)
+		self:enterBulletTime()
+		-- self.dash_max_combo = math.max(self.dash_combo, self.dash_max_combo)
+		self.dash_recharge_timer = self.dash_recharge_time
 		self.dash_combo = 0
 	end
 
-	local angle = math.atan2(dy, dx)
-	self.x2, self.y2 = offsetByVector({x = self.x, y = self.y}, angle, 20)
+	if self:isRechargingDash() then
+		self.dash_recharge_timer = self.dash_recharge_timer - dt
+	end
+
+	if self:isdashing() then
+		self.dash_timer = math.clamp(0.0, self.dash_timer - dt, self.dash_max_time)
+		self.dash_time = self.dash_time + dt
+	else
+		self.dash_time = 0
+	end
+
+	local dx, dy = 0, 0
+	if not self:isdashing() then
+		dx = 0
+		dy = 0
+	end
+
+	if key.isDown("w") then
+		dy = 0 - self:getSpeed() * dt
+	end
+	if key.isDown("s") then
+		dy = self:getSpeed() * dt
+	end
+	if key.isDown("d") then
+		dx = self:getSpeed() * dt
+	end
+	if key.isDown("a") then
+		dx = 0 - self:getSpeed() * dt
+	end
+
+	-- Allow a gamepad to override the keyboard
+	if #joySticks >= 1 then
+		dx = j:getGamepadAxis("leftx")
+		dy = j:getGamepadAxis("lefty")
+	end
+
+	if dx > 0 then
+		self.scale.x = math.copysign(self.scale.x, 1)
+	else
+		self.scale.x = math.copysign(self.scale.x, -1)
+	end
+
+	self.moving = math.abs(dx) > 0.001
+
+	-- TODO: Figure out how to clean this up to keep moving in a straight line
+	-- local dx, dy = self.x - self.oldx, self.y - self.oldy
+
+
+	local angle = math.atan2(dy, dx) 
+	self.oldx, self.oldy = self.x, self.y
+	if dx ~= 0 or dy ~= 0 then
+		self.x, self.y = offsetByVector({x = self.x, y = self.y}, angle, self:getSpeed() * dt)
+		self.x2, self.y2 = offsetByVector({x = self.x, y = self.y}, angle, 20)
+		self.angle = angle
+	elseif self.angle and self:isdashing() then
+		self.x, self.y = offsetByVector({x = self.x, y = self.y}, self.angle, self:getSpeed() * dt)
+		self.x2, self.y2 = offsetByVector({x = self.x, y = self.y}, self.angle, 20)
+	end
 	self:clamp()
 end
 
@@ -162,24 +208,46 @@ function player:clamp()
 	end
 end
 
+local targets = {0, 10, 40, 70, 100, 150, 200, 400, 700 }
+
+function player:targetCombo()
+	for i=1, #targets do
+		if self.dash_combo < targets[i] then 
+			return targets[i]
+		end
+	end
+	return 1000
+end
+
+function player:previousTarget()
+	for i=2, #targets do
+		if self.dash_combo <= targets[i] then 
+			return targets[i - 1]
+		end
+	end
+	return 700
+end
+
 function player:render()
 	local gfx = love.graphics
 	local hp = self.hp_bar
 	gfx.setColor({255,255,0})
 	gfx.setFont(fonts.atSize(14))
 	gfx.print({
-			 {255,255,0}, "COMBO: " .. self.dash_combo .. "/" .. self.dash_max_combo ,
-			 {255,255,0}, "  TIME:" .. string.format("%.2f", self.dash_time - self.dash_timer),
+			 {255,255,0}, "COMBO: " .. self.dash_combo .. " TARGET: " .. self:targetCombo(),
+			 {255,255,0}, "  TIME:" .. string.format("%.2f", self.dash_time),
 		},
 		hp.x, hp.y - 10)
-	gfx.line(hp.x,  hp.y + 10, 50 + hp.w * math.clamp(0.1, (self.dash_combo / self.dash_max_combo), 1), hp.y + 10)
+	gfx.line(hp.x,  hp.y + 10, 50 + hp.w * ((self.dash_timer) / self.dash_max_time), hp.y + 10)
 
 	if self:isRechargingDash() then
 		gfx.setColor({255,0,255})
 		gfx.print("REST:", hp.x - 40, hp.y + 7)
-		gfx.line(hp.x, hp.y + 16, hp.w * math.clamp(0, self.dash_timer / self.dash_recharge_time, 1), hp.y + 16)
+		gfx.line(hp.x, hp.y + 16, hp.w * math.clamp(0, self.dash_recharge_timer / self.dash_recharge_time, 1), hp.y + 16)
 	end
 
+
+	-- Render shield
 	gfx.push()
 	gfx.translate(self.x, self.y)
 	if self:isdashing() then
